@@ -16,7 +16,13 @@ def test_battle_model_behaviors():
     if not node:
         pytest.skip("Node.js required for frontend model tests")
     result = subprocess.run(
-        [node, "--experimental-default-type=module", "--test", "tests/unit/server/battle_model.test.mjs"],
+        [
+            node,
+            "--experimental-default-type=module",
+            "--test",
+            "tests/unit/server/battle_model.test.mjs",
+            "tests/unit/server/battle_combat.test.mjs",
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,

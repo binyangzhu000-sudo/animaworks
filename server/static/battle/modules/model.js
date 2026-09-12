@@ -229,7 +229,9 @@ export class BattleModel {
     if (actor) actor.lastAction = Date.now();
     if (!target) return 0;
     if (action.retreat) return 0;
-    const damage = action.error || action.command === 'guard' ? 0 : action.finish ? target.hp : Math.min(target.hp - 1, (68 + hash(action.tool || action.command) % 93) * Math.min(action.hits, 4));
+    const power = Math.round((68 + hash(action.tool || action.command) % 93) * (action.roll || 1)
+      * (action.critical ? 1.8 : 1) * (action.limit ? 1.5 : 1) * Math.min(action.hits || 1, 4));
+    const damage = action.error || action.command === 'guard' ? 0 : action.finish ? target.hp : Math.min(target.hp - 1, power);
     target.hp -= damage;
     if (action.finish && !this.finished.has(target.key)) {
       if (!target.activity) this.cleared++;

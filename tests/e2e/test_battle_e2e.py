@@ -113,7 +113,7 @@ def test_live_tasks_tools_failure_completion_and_reconnect(page, battle_server):
         lambda route: route.fulfill(json=[{"name": n, "status": "idle"} for n in ["a", "b", "c", "d", "e"]]),
     )
     page.route("**/api/task-board", lambda route: route.fulfill(json={"tasks": tasks}))
-    page.route("**/assets/pixel_sheet.png", lambda route: route.fulfill(status=404))
+    page.route("**/assets/battle_sheet_v1.png", lambda route: route.fulfill(status=404))
     sockets, received = [], []
 
     def connected(ws):
@@ -138,15 +138,20 @@ def test_live_tasks_tools_failure_completion_and_reconnect(page, battle_server):
         "anima.tool_activity",
         {"name": "a", "type": "tool_result", "tool": "Read", "ctx": "task:build", "meta": {"tool_use_id": "read-1"}},
     )
-    page.wait_for_function("document.querySelector('#journal').children.length === 1")
-    assert "ナレッジフレア" in page.locator("#journal").inner_text()
+    page.wait_for_function("document.querySelectorAll('#journal li[data-source=activity]').length === 1")
+    assert page.locator("#journal li[data-source=activity]").first.get_attribute("data-skill") in [
+        "flare",
+        "frost",
+        "thunder",
+        "meteor",
+    ]
     assert page.locator("#partyPage").inner_text() == "1/2 ›"
     send(
         "anima.tool_activity",
         {"name": "a", "event": "tool_end", "tool_name": "Bash", "tool_id": "bash-1", "is_error": True},
     )
-    page.wait_for_function("document.querySelector('#journal').children.length === 2")
-    assert "失敗" in page.locator("#journal li").first.inner_text()
+    page.wait_for_function("document.querySelectorAll('#journal li[data-source=activity]').length === 2")
+    assert "失敗" in page.locator("#journal li[data-source=activity]").first.inner_text()
     send("anima.status", {"name": "a", "status": "idle"})
     page.wait_for_timeout(500)
     assert page.locator("#clearCount").inner_text() == "0"
@@ -204,13 +209,74 @@ def test_base_path_live_transport_and_untrusted_titles(page, battle_server):
             }
         ),
     )
-    page.route("**/assets/pixel_sheet.png", lambda route: route.fulfill(status=404))
+    page.route("**/assets/battle_sheet_v1.png", lambda route: route.fulfill(status=404))
     sockets = []
     page.route_web_socket("**/office/ws", lambda ws: sockets.append(ws))
     page.goto(battle_server + "/office/battle")
     page.wait_for_function("document.querySelectorAll('.target-row').length === 1")
     assert sockets
-    assert page.locator(".target-name").inner_text() == title
+    assert page.locator(".target-name").inner_text() != title
+    page.locator(".target-name").click()
+    assert page.locator("#taskTitle").inner_text() == title
+    assert page.locator("#taskDialog").is_visible()
+    assert page.locator("#taskDialog img").count() == 0
+    page.locator("#taskClose").click()
     assert page.locator("#targets img").count() == 0
     assert page.evaluate("window.injected") is None
     assert page.locator("#modeSwitch").get_attribute("href") == "/office/battle?demo=1"
+
+
+def test_enemies_act_without_events_and_repeated_tools_vary(page, battle_server):
+    page.route("**/api/animas", lambda route: route.fulfill(json=[{"name": "hero", "status": "idle"}]))
+    page.route(
+        "**/api/task-board",
+        lambda route: route.fulfill(
+            json={
+                "tasks": [
+                    {
+                        "anima_name": "hero",
+                        "task_id": "job",
+                        "summary": "/work/tests/test_job.py",
+                        "assignee": "hero",
+                        "queue_status": "in_progress",
+                        "visibility": "active",
+                    }
+                ]
+            }
+        ),
+    )
+    page.route("**/assets/battle_sheet_v1.png", lambda route: route.fulfill(status=404))
+    requests, sockets = [], []
+    page.on("request", lambda request: requests.append(request))
+    page.route_web_socket("**/ws", lambda ws: sockets.append(ws))
+    page.goto(battle_server + "/battle")
+    page.locator("#speed").select_option("4")
+    page.wait_for_function("Number(document.querySelector('.party-row')?.dataset.hp) < 1200")
+    assert "ダメージ" in page.locator("#journal li[data-side=enemy]").first.inner_text()
+    page.wait_for_function(
+        "[...document.querySelectorAll('#journal li[data-source=scene]')].some(el => el.textContent.includes('反撃'))"
+    )
+    assert page.locator("#clearCount").inner_text() == "0"
+    assert page.locator("#activeCount").inner_text() == "1"
+    assert ".py" not in page.locator(".target-name").inner_text()
+    for index in range(3):
+        sockets[-1].send(
+            json.dumps(
+                {
+                    "type": "anima.tool_activity",
+                    "data": {
+                        "name": "hero",
+                        "type": "tool_result",
+                        "tool": "Read",
+                        "ctx": "task:job",
+                        "meta": {"tool_use_id": f"read-{index}"},
+                    },
+                }
+            )
+        )
+    page.wait_for_function("document.querySelectorAll('#journal li[data-source=activity]').length === 3", timeout=20000)
+    skills = page.locator("#journal li[data-source=activity]").evaluate_all("els => els.map(el => el.dataset.skill)")
+    assert len(set(skills)) >= 2
+    assert all(a != b for a, b in zip(skills, skills[1:], strict=False))
+    assert not [r for r in requests if r.method not in {"GET", "HEAD"}]
+    assert not [r for r in requests if r.url.endswith("pixel_sheet.png")]

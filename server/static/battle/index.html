@@ -27,7 +27,7 @@
         <canvas id="battle" width="960" height="440" role="img" data-i18n-title="battle.canvas"></canvas>
         <div id="announcement" class="announcement" role="status"></div>
         <div id="empty" class="empty" hidden><span>✦</span><p data-i18n="battle.empty"></p><small data-i18n="battle.empty_hint"></small></div>
-        <div class="field-caption"><span id="phaseLabel"></span><span data-i18n="battle.auto"></span></div>
+        <div class="field-caption"><span id="phaseLabel"></span><span id="turnLabel"></span></div>
       </div>
       <div class="hud">
         <section class="panel targets"><h2><span data-i18n="battle.targets"></span><small id="reserveCount"></small></h2><div id="targets"></div></section>
@@ -41,6 +41,7 @@
       <div class="mode-switch"><a id="modeSwitch" href="?demo=1" data-i18n="battle.demo_button"></a></div>
     </div>
     <p class="explanation" data-i18n="battle.explanation"></p>
+    <dialog id="taskDialog" aria-labelledby="taskMonster"><h2 id="taskMonster"></h2><p data-i18n="battle.original_task"></p><p id="taskTitle"></p><small id="taskOwner"></small><form method="dialog"><button id="taskClose" type="submit" data-i18n="battle.close"></button></form></dialog>
     <details class="journal" open><summary><span data-i18n="battle.journal"></span><span id="queueCount"></span></summary><ol id="journal"></ol></details>
     <footer><span data-i18n="battle.footer"></span><a href="__AW_BASE__/workspace/" data-i18n="battle.workspace"></a></footer>
   </main>

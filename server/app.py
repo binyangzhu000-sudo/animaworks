@@ -1476,6 +1476,15 @@ def create_app(
         async def _serve_pixel_workspace_index():
             return HTMLResponse(_inject_html(_pixel_workspace_html_raw), headers={"Cache-Control": "no-store"})
 
+    battle_index = static_dir / "battle" / "index.html"
+    if battle_index.exists():
+        battle_html = battle_index.read_text(encoding="utf-8")
+
+        @app.get("/battle", include_in_schema=False)
+        @app.get("/battle/", include_in_schema=False)
+        async def _serve_battle_index():
+            return HTMLResponse(_inject_html(battle_html), headers={"Cache-Control": "no-store"})
+
     if setup_static_dir.exists():
         app.mount(
             "/setup",

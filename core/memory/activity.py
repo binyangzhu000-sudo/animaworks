@@ -155,19 +155,23 @@ class ActivityLogger(
 
     _MAX_CONTENT_CHARS = 20_000
     _live_rate_limiter = _LiveEventRateLimiter(rate=3.0, capacity=5.0)
+    # Lifecycle transitions drive task views (including /battle). Never lose a
+    # completion behind a burst of tool events: no later tool may follow it.
+    _TASK_LIFECYCLE_EVENT_TYPES = frozenset({"task_created", "task_updated", "task_exec_start", "task_exec_end"})
 
-    _LIVE_EVENT_TYPES = frozenset(
-        {
-            "inbox_processing_start",
-            "inbox_processing_end",
-            "message_sent",
-            "response_sent",
-            "channel_post",
-            "task_created",
-            "task_updated",
-            "human_notify",
-            "human_reply",
-        }
+    _LIVE_EVENT_TYPES = (
+        frozenset(
+            {
+                "inbox_processing_start",
+                "inbox_processing_end",
+                "message_sent",
+                "response_sent",
+                "channel_post",
+                "human_notify",
+                "human_reply",
+            }
+        )
+        | _TASK_LIFECYCLE_EVENT_TYPES
     )
 
     # Keep in sync with org-dashboard.js VISIBLE_TOOL_NAMES
@@ -283,7 +287,9 @@ class ActivityLogger(
         written = self._append(entry, safe=safe)
         if written:
             self._export_event(entry)
-        if event_type in self._LIVE_EVENT_TYPES or event_type in ("tool_use", "tool_result"):
+        if event_type in self._TASK_LIFECYCLE_EVENT_TYPES:
+            self._emit_live_event(entry)
+        elif event_type in self._LIVE_EVENT_TYPES or event_type in ("tool_use", "tool_result"):
             allowed, dropped = self._live_rate_limiter.allow(self._anima_name)
             if allowed:
                 self._emit_live_event(entry, dropped=dropped)

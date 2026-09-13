@@ -374,7 +374,7 @@ async def test_priming_with_shared_knowledge(temp_dirs, vector_store, monkeypatc
     assert combined, "Priming should return related knowledge from shared collection"
 
     # Pointer-first recall keeps the readable shared scope in the path.
-    assert 'read_memory_file(path="common_knowledge/' in combined, (
+    assert "common_knowledge/" in combined, (
         f"Expected a readable shared knowledge pointer, got:\n{combined}"
     )
 
@@ -442,8 +442,8 @@ async def test_priming_personal_and_shared_merged(temp_dirs, vector_store, monke
     assert combined, "Priming should return related knowledge"
 
     # Both scopes must retain usable pointers without relying on old labels.
-    has_personal = 'read_memory_file(path="knowledge/' in combined
-    has_shared = 'read_memory_file(path="common_knowledge/' in combined
+    has_personal = "] knowledge/" in combined
+    has_shared = "] common_knowledge/" in combined
     assert has_personal and has_shared, (
         f"Priming output should contain both personal and shared pointers. Got:\n{combined}"
     )

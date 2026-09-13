@@ -216,10 +216,6 @@ class TestNoRegression:
         agent = make_agent_core(name="a-mode", model="openai/gpt-4o")
         assert agent._resolve_execution_mode() == "a"
 
-    def test_b_mode_unchanged(self, make_agent_core):
-        agent = make_agent_core(name="b-mode", model="ollama/gemma3:4b")
-        assert agent._resolve_execution_mode() == "b"
-
     def test_known_models_include_codex(self):
         from core.config.models import KNOWN_MODELS
 

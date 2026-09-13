@@ -373,10 +373,5 @@ def test_list_forgetting_candidates_e2e(anima_dir, vector_store, indexer):
         "Source files should not be archived by candidate listing"
     )
 
-    # At least one of the original source files should be gone
-    source_files_gone = (
-        not chatwork_file.exists() or not slack_file.exists()
-    )
-    assert source_files_gone, (
-        "At least one source file should have been moved to archive"
-    )
+    assert chatwork_file.exists()
+    assert slack_file.exists()

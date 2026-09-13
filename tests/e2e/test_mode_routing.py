@@ -4,7 +4,7 @@
 """Tests for execution mode routing logic.
 
 Verifies that AgentCore._resolve_execution_mode() correctly routes
-to S, C, D, G, X, A, or B based on model name, SDK availability, and config.
+to S, C, D, G, X, or A based on model name, SDK availability, and config.
 No API calls are made in these tests.
 """
 
@@ -40,14 +40,14 @@ class TestModeRouting:
         )
         assert agent._resolve_execution_mode() == "s"
 
-    def test_claude_model_explicit_assisted_routes_to_b(self, make_agent_core):
-        """Claude model + execution_mode='assisted' → Mode B."""
+    def test_claude_model_legacy_assisted_routes_to_a(self, make_agent_core):
+        """The legacy assisted alias resolves to Mode A."""
         agent = make_agent_core(
             name="claude-b",
             model="claude-sonnet-4-6",
             execution_mode="assisted",
         )
-        assert agent._resolve_execution_mode() == "b"
+        assert agent._resolve_execution_mode() == "a"
 
     def test_openai_model_routes_to_a(self, make_agent_core):
         """Non-Claude model (OpenAI) → Mode A."""
@@ -89,22 +89,22 @@ class TestModeRouting:
         )
         assert agent._resolve_execution_mode() == "a"
 
-    def test_ollama_model_explicit_assisted_routes_to_b(self, make_agent_core):
-        """Ollama model + execution_mode='assisted' → Mode B."""
+    def test_ollama_model_legacy_assisted_routes_to_a(self, make_agent_core):
+        """The legacy assisted alias resolves to Mode A for Ollama."""
         agent = make_agent_core(
             name="ollama-b",
             model="ollama/qwen3:14b",
             execution_mode="assisted",
         )
-        assert agent._resolve_execution_mode() == "b"
+        assert agent._resolve_execution_mode() == "a"
 
-    def test_ollama_non_tool_model_routes_to_b(self, make_agent_core):
-        """Ollama model without reliable tool_use → Mode B."""
+    def test_ollama_non_tool_model_routes_to_a(self, make_agent_core):
+        """Ollama models use the unified Mode A loop."""
         agent = make_agent_core(
             name="ollama-gemma-b",
             model="ollama/gemma3:27b",
         )
-        assert agent._resolve_execution_mode() == "b"
+        assert agent._resolve_execution_mode() == "a"
 
     def test_claude_model_without_sdk_still_routes_to_s(self, make_agent_core):
         """Claude model + SDK unavailable → still Mode S (executor handles fallback)."""

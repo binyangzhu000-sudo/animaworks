@@ -27,8 +27,8 @@ def test_v063_migration_syncs_runtime_prompt_surfaces_end_to_end(tmp_path: Path)
     template = Path(__file__).resolve().parents[3] / "templates" / "ja" / "prompts" / "behavior_rules.md"
     assert behavior_rules == template.read_text(encoding="utf-8")
     assert "stale behavior rules" not in behavior_rules
-    assert "`list_tasks`" in behavior_rules
-    assert "`update_task`" in behavior_rules
+    assert "list_tasks" in behavior_rules
+    assert "update_task" in behavior_rules
     assert "gmail_draft" in action_guide
     assert "slack_post" not in action_guide
     assert "trust_level" in skill_creator
@@ -67,6 +67,6 @@ def test_cli_migrate_fresh_process_resyncs_prompt_surfaces(tmp_path: Path) -> No
     template = repo_root / "templates" / "ja" / "prompts" / "behavior_rules.md"
     assert behavior_rules == template.read_text(encoding="utf-8")
     assert "stale behavior rules" not in behavior_rules
-    assert "`list_tasks`" in behavior_rules
-    assert "`update_task`" in behavior_rules
+    assert "list_tasks" in behavior_rules
+    assert "update_task" in behavior_rules
     assert "人間からの指示・依頼は必ず `submit_tasks`" not in behavior_rules

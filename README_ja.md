@@ -137,6 +137,33 @@ uv run animaworks start
 </details>
 
 <details>
+<summary><strong>別の方法: Docker</strong></summary>
+
+```bash
+git clone https://github.com/xuiltul/animaworks.git && cd animaworks
+# 資格情報を .env に置く（git管理外）:
+#   ANTHROPIC_API_KEY=...            # APIキー認証
+#   CLAUDE_CODE_OAUTH_TOKEN=...      # またはサブスクリプション認証: `claude setup-token` (要TTY)
+#   GH_TOKEN=...                     # 任意: animaがclone/pushやPR作成を行うために必要
+docker compose up -d --build
+```
+
+ヘッドレスセットアップ（ブラウザのウィザードを使わない場合）:
+
+```bash
+docker exec -it <container> animaworks init --skip-anima
+docker exec -it <container> animaworks anima create --name alice --template dev-lead
+docker exec -it <container> animaworks config set setup_complete true
+docker exec -it <container> animaworks send <your-name> alice "hello"
+```
+
+- イメージには git / GitHub CLI / Node.js 22 / Claude Code CLI が入っており、`IS_SANDBOX=1` と `--foreground` は焼き込み済みです。データは named volume `animaworks-data`（`/root/.animaworks`）に保存されます。
+- 人間から仕事を渡すのは `animaworks send` です。`animaworks-tool task add` は anima のツール文脈専用です。
+- Homebrew の docker-compose は `~/.docker/cli-plugins/docker-compose` にシンボリックリンクしないと `docker compose` サブコマンドとして認識されません。
+
+</details>
+
+<details>
 <summary><strong>別の方法: pipで手動インストール</strong></summary>
 
 > **macOS ユーザーへ:** macOS Sonoma以前のシステムPython (`/usr/bin/python3`) はバージョン3.9のため、AnimaWorksの要件（3.12+）を満たしません。[Homebrew](https://brew.sh/) で `brew install python@3.13` をインストールするか、上のuvによる方法を使ってください（uvはPythonを自動管理します）。

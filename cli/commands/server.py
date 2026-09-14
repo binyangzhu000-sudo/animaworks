@@ -466,6 +466,10 @@ def cmd_start(args: argparse.Namespace) -> None:
     current terminal with log output (old behaviour).
     """
     if not getattr(args, "foreground", False):
+        if os.getpid() == 1:
+            logger.warning("Running as PID 1 (container); daemonize is not possible, running in foreground")
+            _start_foreground(args)
+            return
         _spawn_daemon(args)
         return
 
@@ -575,6 +579,30 @@ def _run_execution_sdk_preflight(animas_dir: Path | None = None) -> None:
                 "新規spawnされるプロセスは全て失敗する",
                 names,
             )
+
+        if mode_s:
+            names = ", ".join(mode_s)
+            try:
+                from core.platform.claude_code import get_claude_executable
+
+                cli_path = get_claude_executable()
+            except Exception:
+                cli_path = None
+            if cli_path is None:
+                logger.critical(
+                    "Mode S anima %s が存在するが Claude Code CLI が見つからない。"
+                    "Python SDK は CLI を同梱しない。`npm install -g @anthropic-ai/claude-code` で入れよ。"
+                    "CLI が無いと全セッションが『ストリームが3回切断』で失敗する",
+                    names,
+                )
+            if hasattr(os, "geteuid") and os.geteuid() == 0 and os.environ.get("IS_SANDBOX") != "1":
+                logger.critical(
+                    "root で実行中だが IS_SANDBOX が未設定。"
+                    "Claude Code CLI は root で bypassPermissions を拒否して即終了するため、"
+                    "Mode S anima %s の全セッションが『ストリームが3回切断』で失敗する。"
+                    "隔離コンテナなら `IS_SANDBOX=1` を設定、そうでなければ非 root で起動せよ",
+                    names,
+                )
     except Exception:
         logger.exception("Execution SDK preflight failed unexpectedly; continuing server startup")
 

@@ -9,14 +9,22 @@ adhering to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Docker image now ships git, GitHub CLI, Node.js 22 and the Claude Code CLI; entrypoint wires `gh auth setup-git` when `GH_TOKEN` is set; `IS_SANDBOX=1` baked in so Mode S works as root inside the container; README gains a Docker section.
 - `heartbeat.heartbeat_md_max_bytes` (default `20000`): when an anima's `heartbeat.md` grows past the limit, the heartbeat prompt carries a compaction instruction asking the anima to rewrite it down to roughly half, since the file is loaded in full on every run.
 
 ### Changed
 
+- Container CMD runs `start --foreground` (daemonizing as PID 1 caused a restart loop); `animaworks start` auto-falls back to foreground when it is PID 1.
+- Startup preflight now warns when Mode S animas exist but the Claude Code CLI is missing, or the server runs as root without `IS_SANDBOX=1`.
+- `animaworks-tool task` error when run outside an anima context now points to `animaworks send`.
 - Reduced tool-result token growth for task runs: `list_tasks` now returns a compact summary by default (`detail=True` for the full view), and `search_memory` caps results at 8K tokens / 600 lines (~a third of the previous limit).
 - Record Codex `cached_input_tokens` as `cache_read_tokens` so cache read cost shows in token-usage accounting.
 - `heartbeat.delegation_dm_enabled` (default `true`) lets delegate_task skip the wake-up DM, since the pending descriptor already reaches the assignee.
 - Orphan reaper grace is now derived from each anima's heartbeat interval (`heartbeat.orphan_grace_multiplier` / `heartbeat.orphan_grace_min_seconds`) instead of a fixed 30 minutes, so runs that end without a completion declaration can be re-submitted by the anima's next heartbeat before being reaped.
+
+### Fixed
+
+- dev-team docs used the nonexistent `animaworks create`; corrected to `animaworks anima create --name … --template …`.
 
 ## [0.13.0] - 2026-09-05
 

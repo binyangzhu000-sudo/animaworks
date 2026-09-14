@@ -61,7 +61,7 @@ def cmd_vault(args: argparse.Namespace) -> None:
 def _get_anima_namespace() -> str:
     anima_dir_str = os.environ.get("ANIMAWORKS_ANIMA_DIR", "")
     if not anima_dir_str:
-        print("Error: ANIMAWORKS_ANIMA_DIR not set", file=sys.stderr)
+        print("Error: ANIMAWORKS_ANIMA_DIR not set (set automatically inside an anima's tool context)", file=sys.stderr)
         sys.exit(1)
 
     anima_dir = Path(anima_dir_str)

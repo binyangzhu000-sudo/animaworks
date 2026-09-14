@@ -25,7 +25,13 @@ def cmd_task(args: argparse.Namespace) -> None:
     """Dispatch task subcommand."""
     anima_dir_str = os.environ.get("ANIMAWORKS_ANIMA_DIR", "")
     if not anima_dir_str:
-        print("Error: ANIMAWORKS_ANIMA_DIR not set", file=sys.stderr)
+        print(
+            "Error: ANIMAWORKS_ANIMA_DIR not set.\n"
+            "`animaworks-tool task` runs inside an anima's tool context (the server sets this variable).\n"
+            "To hand work to an anima from outside, use:\n"
+            "  animaworks send <your-name> <anima> \"<instruction>\"",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     anima_dir = Path(anima_dir_str)

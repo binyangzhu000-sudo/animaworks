@@ -137,6 +137,33 @@ uv run animaworks start
 </details>
 
 <details>
+<summary><strong>Alternative: Docker</strong></summary>
+
+```bash
+git clone https://github.com/xuiltul/animaworks.git && cd animaworks
+# Put credentials in .env (kept out of git):
+#   ANTHROPIC_API_KEY=...            # API key auth
+#   CLAUDE_CODE_OAUTH_TOKEN=...      # or subscription auth: `claude setup-token` (needs a TTY)
+#   GH_TOKEN=...                     # optional: lets animas clone/push and open PRs
+docker compose up -d --build
+```
+
+Headless setup (skip the browser setup wizard):
+
+```bash
+docker exec -it <container> animaworks init --skip-anima
+docker exec -it <container> animaworks anima create --name alice --template dev-lead
+docker exec -it <container> animaworks config set setup_complete true
+docker exec -it <container> animaworks send <your-name> alice "hello"
+```
+
+- The image ships git / GitHub CLI / Node.js 22 / the Claude Code CLI, with `IS_SANDBOX=1` and `--foreground` baked in. Data lives in a named volume `animaworks-data` (`/root/.animaworks`).
+- Hand work to an anima from outside with `animaworks send`. `animaworks-tool task add` is for an anima's tool context only.
+- Homebrew's docker-compose needs a symlink at `~/.docker/cli-plugins/docker-compose` to be recognized as a `docker compose` subcommand.
+
+</details>
+
+<details>
 <summary><strong>Alternative: manual install with pip</strong></summary>
 
 > **macOS users:** System Python (`/usr/bin/python3`) on macOS Sonoma and earlier is 3.9, which does not meet AnimaWorks (3.12+). Install with [Homebrew](https://brew.sh/) (`brew install python@3.13`) or use the uv method above (uv manages Python for you).

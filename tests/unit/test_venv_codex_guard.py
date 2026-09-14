@@ -135,6 +135,72 @@ class TestExecutionSdkPreflight:
         assert "Mode C anima" in caplog.text
         assert "codex-bot" in caplog.text
 
+    def test_critical_when_mode_s_present_but_cli_missing(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        from cli.commands.server import _run_execution_sdk_preflight
+
+        animas = tmp_path / "animas"
+        _write_status(animas, "kotoha", model="claude-sonnet-5", execution_mode="S")
+
+        with (
+            patch("cli.commands.server._package_importable", return_value=True),
+            patch("core.platform.claude_code.get_claude_executable", return_value=None),
+            patch("cli.commands.server.os.geteuid", return_value=1000),
+            caplog.at_level(logging.CRITICAL, logger="animaworks"),
+        ):
+            _run_execution_sdk_preflight(animas)
+
+        assert any(
+            "Mode S anima" in r.message
+            and "Claude Code CLI" in r.message
+            and r.levelno >= logging.CRITICAL
+            for r in caplog.records
+        )
+
+    def test_critical_when_root_and_sandbox_unset(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from cli.commands.server import _run_execution_sdk_preflight
+
+        animas = tmp_path / "animas"
+        _write_status(animas, "kotoha", model="claude-sonnet-5", execution_mode="S")
+        monkeypatch.delenv("IS_SANDBOX", raising=False)
+
+        with (
+            patch("cli.commands.server._package_importable", return_value=True),
+            patch("core.platform.claude_code.get_claude_executable", return_value="/usr/local/bin/claude"),
+            patch("cli.commands.server.os.geteuid", return_value=0),
+            caplog.at_level(logging.CRITICAL, logger="animaworks"),
+        ):
+            _run_execution_sdk_preflight(animas)
+
+        assert any(
+            "root" in r.message and "IS_SANDBOX" in r.message and r.levelno >= logging.CRITICAL
+            for r in caplog.records
+        )
+
+    def test_no_root_critical_when_sandbox_set(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from cli.commands.server import _run_execution_sdk_preflight
+
+        animas = tmp_path / "animas"
+        _write_status(animas, "kotoha", model="claude-sonnet-5", execution_mode="S")
+        monkeypatch.setenv("IS_SANDBOX", "1")
+
+        with (
+            patch("cli.commands.server._package_importable", return_value=True),
+            patch("core.platform.claude_code.get_claude_executable", return_value="/usr/local/bin/claude"),
+            patch("cli.commands.server.os.geteuid", return_value=0),
+            caplog.at_level(logging.CRITICAL, logger="animaworks"),
+        ):
+            _run_execution_sdk_preflight(animas)
+
+        assert not any(
+            "root" in r.message and "IS_SANDBOX" in r.message for r in caplog.records
+        )
+
 
 # ── (b) Fallback credential guard ────────────────────────────
 

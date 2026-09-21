@@ -139,6 +139,7 @@ def _codex_error_metadata(message: str, model: str) -> dict[str, Any]:
                 guard_key(provider_family_of(model), "codex"),
                 block_seconds,
                 reason.value,
+                reset_in_s=hint.reset_in_s,
             )
         except Exception:
             # Classification must not turn a provider error event into an

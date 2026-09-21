@@ -143,6 +143,7 @@ class TestClassificationMatrix:
             "Usage limit reached for this account",
             "API error (status 402 Payment Required): Grok Build usage balance exhausted",
             "You have reached your weekly limit",
+            "You’ve hit your usage limit. Visit https://chatgpt.com/codex/settings/usage or try again at 10:16 AM.",
             "code=usage_limit_reached",
             "quota exceeded",
             "insufficient_quota",

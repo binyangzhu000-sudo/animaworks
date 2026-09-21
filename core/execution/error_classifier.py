@@ -189,6 +189,8 @@ def provider_family_of(model: str) -> str:
 _QUOTA_EXHAUSTED_PATTERNS = (
     "usagelimitexceeded",
     "usage limit exceeded",
+    # Codex turn/completed carries only the human text of usageLimitExceeded.
+    "hit your usage limit",
     "usage limit reached",
     "usage balance exhausted",
     "weekly limit",

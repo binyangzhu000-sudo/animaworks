@@ -581,7 +581,7 @@ class ExternalMessagingChannelConfig(BaseModel):
 
     enabled: bool = False
     mode: str = "socket"  # "socket" | "webhook"
-    anima_mapping: dict[str, str] = {}  # channel_id → anima_name
+    anima_mapping: dict[str, str] = {}  # channel_id → anima_name ("" = ignore this channel)
     default_anima: str = ""  # fallback anima for unmapped channels
     app_id_mapping: dict[str, str] = {}  # api_app_id → anima_name (per-Anima webhook routing)
     auto_response: bool = False  # auto-post LLM responses back to originating platform
@@ -591,6 +591,17 @@ class ExternalMessagingChannelConfig(BaseModel):
     guild_id: str = ""  # Discord guild snowflake ID (Discord only)
     channel_members: dict[str, list[str]] = {}  # channel_id → [anima_name, ...] (Discord only)
     default_channel_company: str = ""  # company for auto-created boards (empty = no attribution)
+
+    def resolve_anima(self, channel_id: str) -> str:
+        """Return the anima that handles *channel_id*, or ``""`` to ignore it.
+
+        An explicit entry in ``anima_mapping`` always wins, including an empty
+        value, which opts the channel out of routing entirely.  Only channels
+        with no entry at all fall back to ``default_anima``.
+        """
+        if channel_id in self.anima_mapping:
+            return self.anima_mapping[channel_id] or ""
+        return self.default_anima
 
 
 class ZoomRTMSConfig(BaseModel):

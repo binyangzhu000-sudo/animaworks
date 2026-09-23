@@ -1161,10 +1161,13 @@ class PendingTaskExecutor:
         submitted_at = task_desc.get("submitted_at", "")
 
         # Skip if task was cancelled in task_queue (batch path; single path checks in watcher)
+        touched_at = ""
         try:
             from core.memory.task_queue import TaskQueueManager
 
             entry = TaskQueueManager(self._anima_dir).get_task_by_id(task_id)
+            if entry:
+                touched_at = entry.updated_at or ""
             if entry and entry.status == "cancelled":
                 logger.info(
                     "[%s] Skipping cancelled LLM task: id=%s",
@@ -1179,12 +1182,19 @@ class PendingTaskExecutor:
                 exc_info=True,
             )
 
-        # TTL check
-        if submitted_at:
+        # TTL check. The saved input (and its submitted_at) is immutable across
+        # resume, so age is measured from the newest of submission and the last
+        # queue touch; otherwise a resumed task older than the TTL dies on start.
+        stamps = []
+        for raw in (submitted_at, touched_at):
             try:
-                sub_dt = datetime.fromisoformat(submitted_at)
-                if sub_dt.tzinfo is None:
-                    sub_dt = sub_dt.replace(tzinfo=UTC)
+                stamp = datetime.fromisoformat(raw)
+            except (ValueError, TypeError):
+                continue
+            stamps.append(stamp if stamp.tzinfo else stamp.replace(tzinfo=UTC))
+        if stamps:
+            try:
+                sub_dt = max(stamps)
                 now_utc = datetime.now(UTC)
                 age_hours = (now_utc - sub_dt).total_seconds() / 3600
                 if age_hours > _LLM_TASK_TTL_HOURS:

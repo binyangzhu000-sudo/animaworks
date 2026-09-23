@@ -245,6 +245,7 @@ class AnimaRunner:
 
             # Initialize DigitalAnima (heavy: RAG indexer, model loading)
             self.anima = DigitalAnima(anima_dir=self._anima_dir, shared_dir=self.shared_dir)
+            self.anima._session_compactor.start(self.anima)
             self._repair_interrupted_heartbeat()
 
             # Create delegate instances
@@ -1152,6 +1153,8 @@ class AnimaRunner:
 
     async def _cleanup(self) -> None:
         """Clean up resources."""
+        if self.anima is not None:
+            self.anima._session_compactor.shutdown()
         # Release process lock and remove pidfile
         if self._lock_file:
             try:

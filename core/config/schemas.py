@@ -121,6 +121,8 @@ class AnimaDefaults(BaseModel):
     max_tokens: int = 8192
     credential: str = "anthropic"
     context_threshold: float = 0.50
+    context_absolute_ceiling: float = 0.75
+    max_session_age_hours: float = 24.0
     max_chains: int = 2
     conversation_history_threshold: float = 0.30
     execution_mode: str | None = None  # None = auto-detect from model

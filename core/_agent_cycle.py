@@ -14,6 +14,7 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -114,6 +115,80 @@ def _log_session_token_usage(
 
 class CycleMixin:
     """Mixin: blocking and streaming execution cycles + session chaining."""
+
+    async def _guard_chat_sdk_session(
+        self,
+        *,
+        mode: str,
+        uses_chat_session: bool,
+        active_model_config: ModelConfig,
+        thread_id: str,
+    ) -> Any | None:
+        """Recycle an overgrown or over-aged Mode S session before resume."""
+        if mode != "s" or not uses_chat_session:
+            return None
+        from core.execution._sdk_session import SESSION_TYPE_CHAT, load_session_state
+
+        state = load_session_state(self.anima_dir, SESSION_TYPE_CHAT, thread_id)
+        if state is None:
+            return None
+        if not state.session_id:
+            from core.execution._sdk_session import _clear_session_id
+
+            _clear_session_id(self.anima_dir, SESSION_TYPE_CHAT, thread_id)
+            return None
+        now = datetime.now(UTC)
+        try:
+            created = datetime.fromisoformat(state.created_at)
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=UTC)
+            age_hours = max(0.0, (now - created).total_seconds() / 3600)
+        except ValueError:
+            age_hours = 0.0
+        reasons: list[str] = []
+        if state.last_ratio >= active_model_config.context_absolute_ceiling:
+            reasons.append("ceiling")
+        if age_hours >= active_model_config.max_session_age_hours:
+            reasons.append("max_age")
+        if not reasons:
+            return state
+
+        from core.session_compactor import _compact_mode_s_shared
+
+        reason = "+".join(reasons)
+        logger.info(
+            "Recycling chat SDK session before resume: reason=%s ratio=%.3f age_hours=%.2f "
+            "session=%s thread=%s",
+            reason,
+            state.last_ratio,
+            age_hours,
+            state.session_id,
+            thread_id,
+        )
+        await _compact_mode_s_shared(
+            self.anima_dir,
+            self.anima_dir.name,
+            thread_id,
+            trigger="session_recycled",
+            notes="Auto-saved before session recycling",
+        )
+        try:
+            from core.memory.activity import ActivityLogger
+
+            ActivityLogger(self.anima_dir).log(
+                "session_recycled",
+                summary=f"SDK chat session recycled ({reason})",
+                meta={
+                    "reason": reason,
+                    "last_ratio": state.last_ratio,
+                    "age_hours": age_hours,
+                    "session_id": state.session_id,
+                    "thread_id": thread_id,
+                },
+            )
+        except Exception:
+            logger.warning("Failed to log session_recycled activity", exc_info=True)
+        return None
 
     def _cycle_fallback_channel(self, trigger: str) -> str:
         """Activity-log channel name derived from the cycle trigger."""
@@ -487,6 +562,12 @@ class CycleMixin:
 
         session_type = resolve_runtime_session_type(trigger)
         uses_chat_session = trigger_uses_chat_session(trigger)
+        session_state = await self._guard_chat_sdk_session(
+            mode=mode,
+            uses_chat_session=uses_chat_session,
+            active_model_config=active_model_config,
+            thread_id=thread_id,
+        )
         shortterm = ShortTermMemory(self.anima_dir, session_type=session_type, thread_id=thread_id)
         self._prepare_clean_start_session(
             trigger=trigger,
@@ -501,7 +582,15 @@ class CycleMixin:
         tracker = ContextTracker(
             model=active_model_config.model,
             threshold=active_model_config.context_threshold,
+            absolute_ceiling=active_model_config.context_absolute_ceiling,
+            baseline_tokens=session_state.baseline_tokens if session_state is not None else 0,
             context_window_overrides=self._load_context_window_overrides(),
+            anima_dir=self.anima_dir,
+            session_type=session_type if mode == "s" and uses_chat_session else "",
+            thread_id=thread_id,
+            session_id=session_state.session_id if session_state is not None else "",
+            session_created_at=session_state.created_at if session_state is not None else "",
+            session_last_ratio=session_state.last_ratio if session_state is not None else 0.0,
         )
 
         build_result = build_system_prompt(
@@ -1162,6 +1251,12 @@ class CycleMixin:
 
         session_type = resolve_runtime_session_type(trigger)
         uses_chat_session = trigger_uses_chat_session(trigger)
+        session_state = await self._guard_chat_sdk_session(
+            mode=mode,
+            uses_chat_session=uses_chat_session,
+            active_model_config=active_model_config,
+            thread_id=thread_id,
+        )
         shortterm = ShortTermMemory(self.anima_dir, session_type=session_type, thread_id=thread_id)
         self._prepare_clean_start_session(
             trigger=trigger,
@@ -1176,7 +1271,15 @@ class CycleMixin:
         tracker = ContextTracker(
             model=active_model_config.model,
             threshold=active_model_config.context_threshold,
+            absolute_ceiling=active_model_config.context_absolute_ceiling,
+            baseline_tokens=session_state.baseline_tokens if session_state is not None else 0,
             context_window_overrides=self._load_context_window_overrides(),
+            anima_dir=self.anima_dir,
+            session_type=session_type if mode == "s" and uses_chat_session else "",
+            thread_id=thread_id,
+            session_id=session_state.session_id if session_state is not None else "",
+            session_created_at=session_state.created_at if session_state is not None else "",
+            session_last_ratio=session_state.last_ratio if session_state is not None else 0.0,
         )
 
         build_result = build_system_prompt(

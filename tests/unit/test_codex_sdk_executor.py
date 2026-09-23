@@ -2341,6 +2341,7 @@ class TestProgressiveStreaming:
             "openai:codex",
             1800,
             "quota_exhausted",
+            reset_in_s=None,
         )
         error_event = next(e for e in events if e["type"] == "error")
         assert error_event["terminal"] is True
@@ -2402,6 +2403,7 @@ class TestProgressiveStreaming:
             "openai:codex",
             1800,
             "quota_exhausted",
+            reset_in_s=None,
         )
 
     @pytest.mark.asyncio

@@ -143,7 +143,7 @@ def report_capacity_block(
             if long_lived
             else (getattr(hint, "backoff_s", None) or guard.config.default_block_seconds)
         )
-        guard.report_block(key, seconds, reason.value)
+        guard.report_block(key, seconds, reason.value, reset_in_s=getattr(hint, "reset_in_s", None))
         _logger.warning("Registered %s block for %s (%.0fs)", reason.value, key, seconds)
     except Exception:  # pragma: no cover - the guard is fail-open by design
         _logger.debug("Capacity block registration failed", exc_info=True)

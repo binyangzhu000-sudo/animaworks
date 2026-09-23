@@ -157,8 +157,7 @@ class CycleMixin:
 
         reason = "+".join(reasons)
         logger.info(
-            "Recycling chat SDK session before resume: reason=%s ratio=%.3f age_hours=%.2f "
-            "session=%s thread=%s",
+            "Recycling chat SDK session before resume: reason=%s ratio=%.3f age_hours=%.2f session=%s thread=%s",
             reason,
             state.last_ratio,
             age_hours,

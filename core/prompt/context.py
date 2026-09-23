@@ -24,6 +24,8 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
 
 logger = logging.getLogger("animaworks.context_tracker")
 
@@ -183,7 +185,15 @@ class ContextTracker:
 
     model: str = ""
     threshold: float = 0.50
+    absolute_ceiling: float = 0.75
+    baseline_tokens: int = 0
     context_window_overrides: dict[str, int] = field(default_factory=dict)
+    anima_dir: Path | None = None
+    session_type: str = ""
+    thread_id: str = "default"
+    session_id: str = ""
+    session_created_at: str = ""
+    session_last_ratio: float = 0.0
 
     # Internal state
     _last_ratio: float = field(default=0.0, init=False, repr=False)
@@ -193,10 +203,11 @@ class ContextTracker:
     # Tokens the session already costs before a word of conversation: the
     # system prompt plus every tool and MCP schema.  Captured from the first
     # measurement of the session; 0 until then.
-    _baseline_tokens: int = field(default=0, init=False, repr=False)
     _last_tokens: int = field(default=0, init=False, repr=False)
+    _high_water_warned: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self) -> None:
+        self._high_water_warned = self.session_last_ratio >= 0.60
         if not self.model:
             from core.config.models import AnimaDefaults
 
@@ -225,11 +236,6 @@ class ContextTracker:
     def usage_ratio(self) -> float:
         """Absolute fullness — tokens in the request over the window."""
         return self._last_ratio
-
-    @property
-    def baseline_tokens(self) -> int:
-        """The session's fixed cost, measured on its first turn."""
-        return self._baseline_tokens
 
     @property
     def fill_ratio(self) -> float:
@@ -266,12 +272,19 @@ class ContextTracker:
         window = self.context_window
         if not window:
             return 0.0
-        headroom = window - self._baseline_tokens
-        if self._baseline_tokens <= 0 or headroom < _MIN_HEADROOM_TOKENS:
+        headroom = window - self.baseline_tokens
+        if self.baseline_tokens <= 0 or headroom < _MIN_HEADROOM_TOKENS:
             return tokens / window
-        return max(tokens - self._baseline_tokens, 0) / headroom
+        return max(tokens - self.baseline_tokens, 0) / headroom
 
-    def _record(self, tokens: int, *, source: str, set_baseline: bool = True) -> bool:
+    def _record(
+        self,
+        tokens: int,
+        *,
+        source: str,
+        set_baseline: bool = True,
+        persist: bool = True,
+    ) -> bool:
         """Store a measurement and decide whether the threshold is crossed.
 
         *set_baseline* is False for measurements that are a cumulative sum
@@ -283,8 +296,8 @@ class ContextTracker:
         self._last_tokens = tokens
         window = self.context_window
         self._last_ratio = tokens / window if window else 0.0
-        if set_baseline and self._baseline_tokens <= 0 and tokens > 0:
-            self._baseline_tokens = tokens
+        if set_baseline and self.baseline_tokens <= 0 and tokens > 0:
+            self.baseline_tokens = tokens
             logger.info(
                 "Context baseline for this session: %d tokens of %d window (%.1f%%, model=%s)",
                 tokens,
@@ -292,21 +305,62 @@ class ContextTracker:
                 self._last_ratio * 100,
                 self.model,
             )
+
+        if persist and self._last_ratio >= 0.60 and not self._high_water_warned:
+            self._high_water_warned = True
+            age = "-"
+            if self.session_created_at:
+                try:
+                    created = datetime.fromisoformat(self.session_created_at)
+                    if created.tzinfo is None:
+                        created = created.replace(tzinfo=UTC)
+                    age = f"{max(0.0, (datetime.now(UTC) - created).total_seconds() / 3600):.1f}h"
+                except ValueError:
+                    age = "unknown"
+            logger.warning(
+                "context high water: %.1f%% (session=%s, age=%s, baseline=%d)",
+                self._last_ratio * 100,
+                self.session_id or "-",
+                age,
+                self.baseline_tokens,
+            )
+
+        if persist and self.anima_dir is not None and self.session_type:
+            try:
+                from core.execution._sdk_session import record_session_measurement
+
+                record_session_measurement(
+                    self.anima_dir,
+                    self.session_type,
+                    self.thread_id,
+                    tokens=tokens,
+                    ratio=self._last_ratio,
+                    model=self.model,
+                    session_id=self.session_id or None,
+                    baseline_tokens=self.baseline_tokens,
+                )
+            except Exception:
+                logger.debug("Failed to persist context measurement", exc_info=True)
+
         fill = self._fill_ratio(tokens)
-        if self._threshold_hit or fill < self.threshold:
+        fill_hit = fill >= self.threshold
+        ceiling_hit = self._last_ratio >= self.absolute_ceiling
+        if self._threshold_hit or not (fill_hit or ceiling_hit):
             return False
         self._threshold_hit = True
+        rule = "ceiling" if ceiling_hit else "fill"
         logger.warning(
-            "Context threshold %.0f%% exceeded (%s): %d tokens / %d window "
+            "Context threshold %.0f%% exceeded (%s, rule=%s): %d tokens / %d window "
             "(%.1f%% absolute, %.1f%% of the %d tokens above the %d baseline)",
             self.threshold * 100,
             source,
+            rule,
             tokens,
             window,
             self._last_ratio * 100,
             fill * 100,
-            max(window - self._baseline_tokens, 0),
-            self._baseline_tokens,
+            max(window - self.baseline_tokens, 0),
+            self.baseline_tokens,
         )
         return True
 
@@ -366,7 +420,12 @@ class ContextTracker:
         self._output_tokens = usage.get("output_tokens") or usage.get("completion_tokens") or 0
 
         numerator = (self._input_tokens + self._output_tokens) if include_output_in_ratio else self._input_tokens
-        return self._record(numerator, source="usage", set_baseline=not is_cumulative)
+        return self._record(
+            numerator,
+            source="usage",
+            set_baseline=not is_cumulative,
+            persist=not is_cumulative,
+        )
 
     # ── Legacy convenience methods (delegate to update()) ─
 
@@ -422,5 +481,6 @@ class ContextTracker:
         self._threshold_hit = False
         self._input_tokens = 0
         self._output_tokens = 0
-        self._baseline_tokens = 0
+        self.baseline_tokens = 0
         self._last_tokens = 0
+        self._high_water_warned = False

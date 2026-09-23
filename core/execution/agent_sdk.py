@@ -88,6 +88,7 @@ from core.execution._sdk_session import (  # noqa: F401
     SESSION_TYPE_HEARTBEAT,
     SESSION_TYPE_INBOX,
     SESSION_TYPE_TASK,
+    SessionContextState,
     _build_sdk_query_input,
     _cleanup_prompt_files,
     _cleanup_tool_outputs,
@@ -100,6 +101,8 @@ from core.execution._sdk_session import (  # noqa: F401
     _session_file,
     clear_session_id_for_type,
     compact_sdk_session,
+    load_session_state,
+    record_session_measurement,
 )
 from core.execution._sdk_stream import (  # noqa: F401
     StreamingContext,
